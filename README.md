@@ -1,1 +1,1 @@
-These are from my AI/ML bootcamp, poke around if you want.
+These are from my AI/ML bootcamp and hackerrank, poke around if you want.
