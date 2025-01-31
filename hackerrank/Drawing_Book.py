@@ -13,10 +13,19 @@ import sys
 # The function accepts following parameters:
 #  1. INTEGER n
 #  2. INTEGER p
-# 
+##################### 
+
 
 def pageCount(n, p):
-    # Write your code here
+    assert 1 <= n <= 10**5, "n is out of range"
+    assert 1 <= p <= n, "p is out of range"
+
+    # Turns from the front
+    front_flips = p // 2  
+    # Turns from the back
+    back_flips = (n // 2) - (p // 2)
+
+    return min(front_flips, back_flips)
 
 if __name__ == '__main__':
     fptr = open(os.environ['OUTPUT_PATH'], 'w')
