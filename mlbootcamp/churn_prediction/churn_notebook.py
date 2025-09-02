@@ -21,7 +21,10 @@ import warnings
 warnings.filterwarnings('ignore')
 
 # Set style for better plots
-plt.style.use('seaborn-v0_8')
+try:
+    plt.style.use('seaborn-v0_8')
+except Exception:
+    plt.style.use('seaborn-darkgrid')
 sns.set_palette("husl")
 np.random.seed(42)
 
@@ -359,10 +362,17 @@ plt.tight_layout()
 plt.show()
 
 # Cell 15: Feature Importance (Random Forest)
-# Get feature names after preprocessing
-feature_names = (list(numerical_cols) + 
-                [f"{col}_{val}" for col, vals in preprocessor.named_transformers_['cat'].categories_ 
-                 for val in vals[1:]])
+# Get feature names after preprocessing (robust to sklearn versions)
+try:
+    feature_names = list(preprocessor.get_feature_names_out())
+except Exception:
+    num_names = list(numerical_cols)
+    ohe = preprocessor.named_transformers_['cat']
+    if hasattr(ohe, 'get_feature_names_out'):
+        cat_names = list(ohe.get_feature_names_out(list(categorical_cols)))
+    else:
+        cat_names = [f"{col}_{cat}" for col, cats in zip(categorical_cols, ohe.categories_) for cat in cats[1:]]
+    feature_names = num_names + cat_names
 
 # Get feature importance from Random Forest
 rf_model = models['Random Forest']
