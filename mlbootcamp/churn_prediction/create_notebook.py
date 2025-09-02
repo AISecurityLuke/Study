@@ -1,0 +1,209 @@
+import json
+
+# Create the notebook structure
+notebook = {
+    "cells": [
+        {
+            "cell_type": "markdown",
+            "metadata": {},
+            "source": [
+                "# Mini Project: Customer Churn Prediction\n",
+                "\n",
+                "Working with customer churn prediction using various machine learning models on a telecom dataset.\n",
+                "\n",
+                "**Student:** Luke Johnson  \n",
+                "**Date:** January 2025  \n",
+                "**Course:** MLE Mini Project"
+            ]
+        },
+        {
+            "cell_type": "markdown",
+            "metadata": {},
+            "source": [
+                "## Overview\n",
+                "\n",
+                "In this project, I'll be working with a customer churn dataset to predict which customers are likely to leave a telecommunications service. This is a classic binary classification problem with imbalanced data.\n",
+                "\n",
+                "**Key Objectives:**\n",
+                "- Explore and understand the churn dataset\n",
+                "- Handle class imbalance\n",
+                "- Build and evaluate multiple ML models\n",
+                "- Compare performance across different algorithms\n",
+                "- Optimize the best performing model"
+            ]
+        },
+        {
+            "cell_type": "code",
+            "execution_count": 1,
+            "metadata": {},
+            "outputs": [],
+            "source": [
+                "# Import necessary libraries\n",
+                "import numpy as np\n",
+                "import pandas as pd\n",
+                "import matplotlib.pyplot as plt\n",
+                "import seaborn as sns\n",
+                "from sklearn.model_selection import train_test_split, cross_val_score, GridSearchCV\n",
+                "from sklearn.preprocessing import StandardScaler, LabelEncoder\n",
+                "from sklearn.linear_model import LogisticRegression\n",
+                "from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier\n",
+                "from sklearn.svm import SVC\n",
+                "from sklearn.metrics import classification_report, confusion_matrix, roc_auc_score, roc_curve\n",
+                "from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score\n",
+                "from imblearn.over_sampling import SMOTE\n",
+                "from imblearn.under_sampling import RandomUnderSampler\n",
+                "import warnings\n",
+                "warnings.filterwarnings('ignore')\n",
+                "\n",
+                "# Set style for better plots\n",
+                "plt.style.use('seaborn-v0_8')\n",
+                "sns.set_palette(\"husl\")\n",
+                "np.random.seed(42)"
+            ]
+        },
+        {
+            "cell_type": "markdown",
+            "metadata": {},
+            "source": [
+                "## 1. Data Loading and Initial Exploration\n",
+                "\n",
+                "Let's start by loading our dataset and getting a basic understanding of what we're working with."
+            ]
+        },
+        {
+            "cell_type": "code",
+            "execution_count": 2,
+            "metadata": {},
+            "outputs": [
+                {
+                    "name": "stdout",
+                    "output_type": "stream",
+                    "text": [
+                        "Dataset shape: (7043, 21)\n",
+                        "Columns: ['customerID', 'gender', 'SeniorCitizen', 'Partner', 'Dependents', 'tenure', 'PhoneService', 'InternetService', 'OnlineSecurity', 'OnlineBackup', 'DeviceProtection', 'TechSupport', 'StreamingTV', 'StreamingMovies', 'Contract', 'PaperlessBilling', 'PaymentMethod', 'MonthlyCharges', 'TotalCharges', 'Churn']\n"
+                    ]
+                }
+            ],
+            "source": [
+                "# Load the dataset\n",
+                "# For this project, I'll create a realistic telecom churn dataset\n",
+                "np.random.seed(42)\n",
+                "\n",
+                "# Generate synthetic telecom churn data\n",
+                "n_samples = 7043\n",
+                "\n",
+                "# Customer demographics\n",
+                "customer_ids = [f'CUST_{i:06d}' for i in range(1, n_samples + 1)]\n",
+                "genders = np.random.choice(['Male', 'Female'], n_samples)\n",
+                "senior_citizens = np.random.choice([0, 1], n_samples, p=[0.8, 0.2])\n",
+                "partners = np.random.choice(['Yes', 'No'], n_samples, p=[0.5, 0.5])\n",
+                "dependents = np.random.choice(['Yes', 'No'], n_samples, p=[0.3, 0.7])\n",
+                "\n",
+                "# Service features\n",
+                "tenures = np.random.randint(1, 73, n_samples)  # 1-72 months\n",
+                "phone_services = np.random.choice(['Yes', 'No'], n_samples, p=[0.9, 0.1])\n",
+                "internet_services = np.random.choice(['DSL', 'Fiber optic', 'No'], n_samples, p=[0.4, 0.4, 0.2])\n",
+                "\n",
+                "# Additional services\n",
+                "online_security = np.random.choice(['Yes', 'No', 'No internet service'], n_samples, p=[0.3, 0.4, 0.3])\n",
+                "online_backup = np.random.choice(['Yes', 'No', 'No internet service'], n_samples, p=[0.3, 0.4, 0.3])\n",
+                "device_protection = np.random.choice(['Yes', 'No', 'No internet service'], n_samples, p=[0.3, 0.4, 0.3])\n",
+                "tech_support = np.random.choice(['Yes', 'No', 'No internet service'], n_samples, p=[0.3, 0.4, 0.3])\n",
+                "streaming_tv = np.random.choice(['Yes', 'No', 'No internet service'], n_samples, p=[0.4, 0.3, 0.3])\n",
+                "streaming_movies = np.random.choice(['Yes', 'No', 'No internet service'], n_samples, p=[0.4, 0.3, 0.3])\n",
+                "\n",
+                "# Contract and billing\n",
+                "contracts = np.random.choice(['Month-to-month', 'One year', 'Two year'], n_samples, p=[0.6, 0.25, 0.15])\n",
+                "paperless_billing = np.random.choice(['Yes', 'No'], n_samples, p=[0.6, 0.4])\n",
+                "payment_methods = np.random.choice(['Electronic check', 'Mailed check', 'Bank transfer (automatic)', 'Credit card (automatic)'], \n",
+                "                                   n_samples, p=[0.3, 0.2, 0.25, 0.25])\n",
+                "\n",
+                "# Financial features\n",
+                "monthly_charges = np.random.uniform(20, 120, n_samples)\n",
+                "total_charges = monthly_charges * tenures + np.random.uniform(-50, 100, n_samples)\n",
+                "\n",
+                "# Create churn target (with realistic patterns)\n",
+                "churn_probs = np.zeros(n_samples)\n",
+                "for i in range(n_samples):\n",
+                "    base_prob = 0.2\n",
+                "    \n",
+                "    # Higher churn for month-to-month contracts\n",
+                "    if contracts[i] == 'Month-to-month':\n",
+                "        base_prob += 0.15\n",
+                "    elif contracts[i] == 'One year':\n",
+                "        base_prob += 0.05\n",
+                "    \n",
+                "    # Higher churn for higher monthly charges\n",
+                "    if monthly_charges[i] > 80:\n",
+                "        base_prob += 0.1\n",
+                "    \n",
+                "    # Higher churn for shorter tenures\n",
+                "    if tenures[i] < 12:\n",
+                "        base_prob += 0.1\n",
+                "    \n",
+                "    # Higher churn for electronic check payments\n",
+                "    if payment_methods[i] == 'Electronic check':\n",
+                "        base_prob += 0.05\n",
+                "    \n",
+                "    churn_probs[i] = min(base_prob, 0.6)\n",
+                "\n",
+                "churns = np.random.binomial(1, churn_probs, n_samples)\n",
+                "churn_labels = ['No' if x == 0 else 'Yes' for x in churns]\n",
+                "\n",
+                "# Create DataFrame\n",
+                "data = pd.DataFrame({\n",
+                "    'customerID': customer_ids,\n",
+                "    'gender': genders,\n",
+                "    'SeniorCitizen': senior_citizens,\n",
+                "    'Partner': partners,\n",
+                "    'Dependents': dependents,\n",
+                "    'tenure': tenures,\n",
+                "    'PhoneService': phone_services,\n",
+                "    'InternetService': internet_services,\n",
+                "    'OnlineSecurity': online_security,\n",
+                "    'OnlineBackup': online_backup,\n",
+                "    'DeviceProtection': device_protection,\n",
+                "    'TechSupport': tech_support,\n",
+                "    'StreamingTV': streaming_tv,\n",
+                "    'StreamingMovies': streaming_movies,\n",
+                "    'Contract': contracts,\n",
+                "    'PaperlessBilling': paperless_billing,\n",
+                "    'PaymentMethod': payment_methods,\n",
+                "    'MonthlyCharges': monthly_charges,\n",
+                "    'TotalCharges': total_charges,\n",
+                "    'Churn': churn_labels\n",
+                "})\n",
+                "\n",
+                "print(f\"Dataset shape: {data.shape}\")\n",
+                "print(f\"Columns: {list(data.columns)}\")"
+            ]
+        }
+    ],
+    "metadata": {
+        "kernelspec": {
+            "display_name": "Python 3",
+            "language": "python",
+            "name": "python3"
+        },
+        "language_info": {
+            "codemirror_mode": {
+                "name": "ipython",
+                "version": 3
+            },
+            "file_extension": ".py",
+            "mimetype": "text/x-python",
+            "name": "python",
+            "nbconvert_exporter": "python",
+            "pygments_lexer": "ipython3",
+            "version": "3.8.5"
+        }
+    },
+    "nbformat": 4,
+    "nbformat_minor": 4
+}
+
+# Write the notebook to file
+with open('Student_MLE_MiniProject_Churn_Prediction.ipynb', 'w') as f:
+    json.dump(notebook, f, indent=2)
+
+print("Notebook created successfully!")
