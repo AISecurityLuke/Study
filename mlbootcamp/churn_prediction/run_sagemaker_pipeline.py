@@ -1,5 +1,6 @@
 import argparse
 import os
+from typing import Optional
 import boto3
 import sagemaker
 from sagemaker.session import Session
@@ -9,14 +10,10 @@ from sagemaker.sklearn.processing import SKLearnProcessor
 from sagemaker.workflow.steps import ProcessingStep, TrainingStep, TransformStep
 from sagemaker.inputs import TrainingInput, TransformInput
 from sagemaker.estimator import Estimator
-from sagemaker.workflow.conditions import ConditionGreaterThan
-from sagemaker.workflow.condition_step import ConditionStep
-from sagemaker.workflow.functions import MetricsSource
-from sagemaker.model_metrics import MetricsSource as ModelMetricsSource, ModelMetrics
 from sagemaker.workflow.step_collections import RegisterModel
 
 
-def get_session(region: str | None = None) -> Session:
+def get_session(region: Optional[str] = None) -> Session:
     boto_sess = boto3.Session(region_name=region)
     sagemaker_sess = sagemaker.session.Session(boto_session=boto_sess)
     return sagemaker_sess
@@ -94,15 +91,7 @@ def build_pipeline(region: str, role_arn: str, bucket: str, base_job_prefix: str
         },
     )
 
-    # Model metrics from training job
-    metrics = ModelMetrics(
-        model_statistics=ModelMetricsSource(
-            s3_uri=step_train.properties.ModelArtifacts.S3ModelArtifacts,
-            content_type="application/json",
-        )
-    )
-
-    # Register model
+    # Register model (without metrics for simplicity)
     step_register = RegisterModel(
         name="RegisterModel",
         estimator=estimator,
@@ -112,7 +101,6 @@ def build_pipeline(region: str, role_arn: str, bucket: str, base_job_prefix: str
         inference_instances=["ml.m5.large"],
         transform_instances=["ml.m5.large"],
         model_package_group_name=f"{base_job_prefix}-package-group",
-        model_metrics=metrics,
     )
 
     # Batch transform
@@ -127,10 +115,6 @@ def build_pipeline(region: str, role_arn: str, bucket: str, base_job_prefix: str
         inputs=TransformInput(data=test_s3, content_type="text/csv"),
     )
 
-    # Simple quality gate placeholder (would normally parse metrics)
-    cond = ConditionGreaterThan(left=0.7, right=0.5)
-    step_cond = ConditionStep(name="QualityGate", conditions=[cond], if_steps=[step_register, step_transform], else_steps=[])
-
     pipeline = Pipeline(
         name=f"{base_job_prefix}-pipeline",
         parameters=[
@@ -142,7 +126,7 @@ def build_pipeline(region: str, role_arn: str, bucket: str, base_job_prefix: str
             eta,
             num_round,
         ],
-        steps=[step_process, step_train, step_cond],
+        steps=[step_process, step_train, step_register, step_transform],
         sagemaker_session=sess,
     )
 
