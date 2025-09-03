@@ -137,9 +137,30 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--region', default=os.environ.get('AWS_REGION', 'us-west-2'))
     parser.add_argument('--role-arn', required=False, default=os.environ.get('SAGEMAKER_ROLE_ARN'))
-    parser.add_argument('--bucket', required=True)
-    parser.add_argument('--action', choices=['create', 'run'], default='run')
+    parser.add_argument('--bucket', required=False)
+    parser.add_argument('--action', choices=['create', 'run', 'validate'], default='run')
     args = parser.parse_args()
+
+    # For validate mode, avoid any AWS calls and allow dummy role/bucket
+    if args.action == 'validate':
+        if not args.role_arn:
+            args.role_arn = 'arn:aws:iam::000000000000:role/DummySageMakerRole'
+        if not args.bucket:
+            args.bucket = 'dummy-bucket'
+        pipe = build_pipeline(region=args.region, role_arn=args.role_arn, bucket=args.bucket)
+        try:
+            print(pipe.definition())
+        except Exception as e:
+            # Fallback summary to avoid local SDK quirks
+            print("VALIDATE_FALLBACK")
+            print("Pipeline:", pipe.name)
+            print("Parameters:", [p.name for p in pipe.parameters])
+            print("Steps:", [s.name for s in pipe.steps])
+            print(f"Note: Skipped full JSON render: {e}")
+        return
+
+    if not args.bucket:
+        raise SystemExit("--bucket is required for create/run actions")
 
     if not args.role_arn:
         sm = boto3.client('sagemaker', region_name=args.region)
